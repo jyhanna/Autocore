@@ -1,11 +1,20 @@
 import socket
 import thread
 import pickle
+import logging
+"""
+"""
+
 
 CORE_INIT = False
 PORT_OBSERVER = 8000
 PORT_NOTIFIER = 8001
 HOST = "127.0.0.1"
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 class Networker(object):
     """
@@ -30,6 +39,10 @@ class Networker(object):
             try:
                 # Change to fragmented sends to allow for eval of header
                 # w/ subject in observer before sending all the data over
+                #split_message = self._header_split(out_data)
+                #print split_message[0]
+                #observer_socket.sendall(split_message[0])
+                #observer_socket.sendall(split_message[1])
                 observer_socket.sendall(out_data)
             except socket.error:
                 pass  # Unprepared observer
@@ -66,7 +79,7 @@ class Networker(object):
         return (matching_subject, received_message)
 
     def _header_parse(self, message_frag):
-        header = message_frag.split(self.SUBJECT_DELIM, 1)[0]
+        header = self._header_split(message_frag)[0]
         data_size = int(header.split(self.SIZE_DELIM, 1)[0])
         notf_subj = header.split(self.SIZE_DELIM, 1)[1]
 
@@ -82,10 +95,18 @@ class Networker(object):
 
         return send_data
 
+    def _header_split(self, message):
+        return message.split(self.SUBJECT_DELIM, 1)
+
+
 class Initialize(Networker):
     """
     Initializes a new system network. Instantiate this object
     once before creating Notifiers or Observers in any modules.
+    When initializing multiple times (eg. across independent modules
+    running simultaneously), subsequent initializations will have
+    no effect. This means the first `Initialize()` call from the first
+    running module will launch the network's core.
     """
     port_notifier = PORT_NOTIFIER
     port_observer = PORT_OBSERVER
@@ -93,9 +114,16 @@ class Initialize(Networker):
     observer_sockets = []
 
     def __init__(self, system):
-        self.system = system
-        self._init_relay(self.port_observer, self._connect_observer)
-        self._init_relay(self.port_notifier, self._connect_notifier)
+        if not self._core_running():
+            self.system = system
+            self._init_relay(self.port_observer, self._connect_observer)
+            self._init_relay(self.port_notifier, self._connect_notifier)
+
+    def _core_running(self):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        result = sock.connect_ex((self.host, self.port_observer))
+        sock.close()
+        return result == 0
 
     def _init_relay(self, port, connection_callback):
         try:
@@ -106,7 +134,7 @@ class Initialize(Networker):
             thread.start_new_thread(self._listen, (sock, connection_callback))
 
         except socket.error, msg:
-            print "Socket error (core): " + msg[1]
+            logger.warn("Socket error (core): " + msg[1])
 
     def _listen(self, sock, connection_callback):
         while True:
@@ -114,16 +142,19 @@ class Initialize(Networker):
             thread.start_new_thread(connection_callback, (conn_sock, addr,))
 
     def _connect_notifier(self, conn_sock, addr):
-        print "Core connected to notifier [" + str(addr[1]) + "]"
+        logger.info("Core connected to notifier [" + str(addr[1]) + "]")
         self._net_relay(conn_sock, self.observer_sockets)
 
     def _connect_observer(self, conn_sock, addr):
-        print "Core connected to observer [" + str(addr[1]) + "]"
+        logger.info("Core connected to observer [" + str(addr[1]) + "]")
         self.observer_sockets.append(conn_sock)
+
 
 class Notifier(Networker):
     """
-    Data Notifier.
+    Provides a directed notification mechanism through which objects
+    can be sent. All observers listening on a notifier's subject will
+    recieve a notification.
     """
     host = HOST
     port = PORT_NOTIFIER
@@ -137,12 +168,13 @@ class Notifier(Networker):
             self._net_send(message, self.subject)
 
         except socket.error, msg:
-            print "Socket error (notifier): " + msg[1]
+            logger.warn("Socket error (notifier): " + msg[1])
 
 
 class Observer(Networker):
     """
-    Data observer.
+    Provides an observation mechanism for modules to listen
+    to incoming notifications of the Observer's subject.
     """
     host = HOST
     port = PORT_OBSERVER
@@ -161,5 +193,5 @@ class Observer(Networker):
                     self.callback(received_obj)
 
             except socket.error, msg:
-                print "Socket error (observer): " + msg[1]
+                logger.warn("Socket error (observer): " + msg[1])
                 break
