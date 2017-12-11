@@ -6,6 +6,7 @@ PORT_OBSERVER = 8000
 PORT_NOTIFIER = 8001
 HOST = "127.0.0.1"
 
+# Change to module-level logger
 logger = network.logger
 
 
@@ -18,8 +19,8 @@ class Initialize(object):
     no effect. This means the first `Initialize()` call from the first
     running module will launch the network's core.
     """
-    def __init__(self, system):
-        network.Relay(system, PORT_NOTIFIER, PORT_OBSERVER, HOST)
+    def __init__(self, module):
+        network.Relay(module, PORT_NOTIFIER, PORT_OBSERVER, HOST)
 
 
 class Notifier(object):
