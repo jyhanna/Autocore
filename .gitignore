@@ -1,3 +1,4 @@
 *.pyc
-test.py
+autocore.egg-info/
 .DS_Store
+test.py
