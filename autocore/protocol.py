@@ -1,3 +1,4 @@
+#! /usr/bin/env python
 """
 Simple TCP-based protocol. The format of each discrete message
 is: `size`$$`subject`##`payload`.

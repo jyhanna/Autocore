@@ -1,0 +1,11 @@
+setup.py
+autocore/__init__.py
+autocore/_version.py
+autocore/core.py
+autocore/messages.py
+autocore/network.py
+autocore/protocol.py
+autocore.egg-info/PKG-INFO
+autocore.egg-info/SOURCES.txt
+autocore.egg-info/dependency_links.txt
+autocore.egg-info/top_level.txt
